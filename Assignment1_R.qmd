@@ -1,0 +1,183 @@
+---
+title: "Assignment 1"
+author: "Balpreet Kaur Saluja - 24202918"
+format: 
+  revealjs:
+    theme: simple
+    slide-number: true
+    transition: fade
+    smaller: true
+    css: custom.css
+execute: 
+  echo: true
+engine: knitr
+editor: visual
+---
+
+## Introduction:
+
+We analyze social and development indicators from three diverse countries: **Brazil** (a large upper-middle-income country in South America), **Kazakhstan** (a Central Asian upper-middle-income nation), and **Madagascar** (a low-income island country in Africa). These countries were chosen to highlight contrasts in population trends, poverty, and life expectancy across different regions and income levels.
+
+```{r echo=FALSE}
+library(data.table)
+library(ggplot2)
+```
+
+## 1. Read and preprocess the data:
+
+```{r}
+bra <- fread("indicators_bra.csv")
+kaz <- fread("indicators_kaz.csv")
+mdg <- fread("indicators_mdg.csv")
+bra[, lapply(.SD, class)]
+kaz[, lapply(.SD, class)]
+mdg[, lapply(.SD, class)]
+```
+
+The first row in each dataset contains headers or empty info, so we remove it. We also ensure`Year` is integer and `Value` is numeric for valid analysis.
+
+```{r}
+bra <- bra[-1]
+bra[, Year := as.integer(Year)]
+bra[, Value := as.numeric(Value)]
+kaz <- kaz[-1]
+kaz[, Year := as.integer(Year)]
+kaz[, Value := as.numeric(Value)]
+mdg <- mdg[-1]
+mdg[, Year := as.integer(Year)]
+mdg[, Value := as.numeric(Value)]
+```
+
+## 2. Merging the data:
+
+```{r}
+# Add a Country column to each data.table (if not already present)
+bra[, Country := "Brazil"]
+kaz[, Country := "Kazakhstan"]
+mdg[, Country := "Madagascar"]
+
+# Merge the datasets using data.table's rbindlist()
+merged_data <- rbindlist(list(bra, kaz, mdg))
+
+
+
+```
+
+A `Country` column is added to each dataset to keep track of origin. We merge the three data.tables using `rbindlist()` for fast vertical stacking.
+
+## 3. Quick data exploration to know more about data:
+
+```{r}
+# Number of unique indicators in each country
+merged_data[, uniqueN(`Indicator Name`), by = Country]
+```
+
+This shows the breadth of data coverage per country by counting how many unique indicators are available in each dataset.
+
+```{r}
+# Earliest and latest year available per country
+merged_data[, .(MinYear = min(Year, na.rm = TRUE),
+                MaxYear = max(Year, na.rm = TRUE)), 
+            by = Country]
+```
+
+We explore the time span of data available for each country, helping us understand historical depth and recentness.
+
+## 
+
+```{r}
+# Top 5 most frequent indicators overall
+merged_data[, .N, by = `Indicator Name`][order(-N)][1:5]
+```
+
+Identifies which indicators are most frequently recorded across all countries — potentially useful for cross-country comparisons.
+
+```{r}
+# Summary statistics for Value by country
+merged_data[, .(
+  Min = min(Value, na.rm = TRUE),
+  Q1  = quantile(Value, 0.25, na.rm = TRUE),
+  Median = median(Value, na.rm = TRUE),
+  Q3 = quantile(Value, 0.75, na.rm = TRUE),
+  Max = max(Value, na.rm = TRUE)
+), by = Country]
+
+```
+
+Basic summary statistics give an overview of the range and central tendency of values recorded per country.
+
+## 4. Data Analysis Using `data.table (keyby):`
+
+```{r}
+# Selecting 3 indicators for focused analysis
+focus_indicators <- c(
+  "Population, total",
+  "Life expectancy at birth, total (years)",
+  "Poverty headcount ratio at $5.50 a day (2011 PPP) (% of population)"
+)
+
+focus_data <- merged_data[`Indicator Name` %in% focus_indicators]
+
+#Average Value per Country & Indicator
+focus_data[, .(
+  Average = mean(Value, na.rm = TRUE),
+  Count = .N
+), keyby = .(`Indicator Name`, Country)]
+```
+
+We focus the analysis on three crucial indicators across all countries — population size, life expectancy, and poverty — for meaningful comparison.
+
+## 
+
+```{r}
+focus_data[, .(
+  MinYear = min(Year, na.rm = TRUE),
+  MaxYear = max(Year, na.rm = TRUE)
+), keyby = .(`Indicator Name`, Country)]
+
+```
+
+Here we check how long each indicator has been tracked in each country — useful for understanding data continuity.
+
+```{r}
+focus_data[is.na(Value), .N, keyby = .(`Indicator Name`, Country)]
+
+```
+
+This identifies missing values per indicator and country, helping assess data quality.
+
+## 
+
+**5. Plotting Results:**
+
+```{r}
+# Filter population data
+pop <- focus_data[`Indicator Name` == "Population, total"]
+
+ggplot(pop, aes(x = Year, y = Value / 1e6, color = Country)) +
+  geom_line(linewidth = 1.2) +
+  labs(title = "Population Growth (in millions)", 
+       y = "Population (millions)", x = "Year") +
+  theme_minimal()
+
+
+```
+
+**Interpretation:** Brazil and Madagascar show consistent growth, with Madagascar having a steeper rise. Kazakhstan's growth is slower but steady.
+
+## 
+
+```{r}
+# Preparing life data
+life <- focus_data[`Indicator Name` == "Life expectancy at birth, total (years)"]
+
+ggplot(life, aes(x = Country, y = Value, fill = Country)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Life Expectancy by Country",
+       y = "Years", x = NULL) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+**Interpretation:** Brazil has the highest median life expectancy, followed by Kazakhstan. Madagascar lags behind, reflecting differences in development.
