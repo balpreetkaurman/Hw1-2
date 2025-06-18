@@ -51,12 +51,12 @@ mdg[, Value := as.numeric(Value)]
 ## 2. Merging the data:
 
 ```{r}
-# Add a Country column to each data.table (if not already present)
+# Adding a Country column to each data.table
 bra[, Country := "Brazil"]
 kaz[, Country := "Kazakhstan"]
 mdg[, Country := "Madagascar"]
 
-# Merge the datasets using data.table's rbindlist()
+# Merging the datasets using data.table's rbindlist()
 merged_data <- rbindlist(list(bra, kaz, mdg))
 
 
